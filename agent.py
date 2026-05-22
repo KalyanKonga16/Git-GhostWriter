@@ -5,13 +5,14 @@ from typing import Callable, Optional
 from git import Repo, GitCommandError
 from fnmatch import fnmatch
 from langgraph.graph import StateGraph, END
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 from langchain_groq import ChatGroq
 from config import *
 from storage import upload_docs
 import traceback
 
-llm = ChatGroq(model=LLM_MODEL, temperature=0.05)
+# --- REMOVED: llm = ChatGroq(...) at module level ---
+# We'll initialize it inside a function instead
 
 IMPORTANT_FILE_NAMES = {
     "README.md", "requirements.txt", "package.json", "pyproject.toml",
@@ -24,8 +25,6 @@ IMPORTANT_EXTENSIONS = {
 }
 
 class AgentState(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     github_url: str
     repo_path: Optional[str] = None
     files: list = Field(default_factory=list)
@@ -37,11 +36,16 @@ class AgentState(BaseModel):
     repo_tree: Optional[str] = None
     repo_context: Optional[str] = None
 
+    class Config:
+        arbitrary_types_allowed = True
+
+def get_llm():
+    """Initialize LLM lazily to ensure secrets are loaded first"""
+    return ChatGroq(model=LLM_MODEL, temperature=0.05)
 
 def update_progress(state, stage, progress):
     if state.progress_callback:
         state.progress_callback(stage, progress)
-
 
 def clean_github_url(url: str) -> str:
     if "/tree/" in url:
@@ -50,21 +54,22 @@ def clean_github_url(url: str) -> str:
         url = url.split("/blob/")[0]
     return url.rstrip("/")
 
-
 def is_important_file(path: str) -> bool:
     name = os.path.basename(path)
     ext = os.path.splitext(path)[1].lower()
+
     if name in IMPORTANT_FILE_NAMES:
         return True
+
     if ext in IMPORTANT_EXTENSIONS and (
         path.count(os.sep) <= 2 or
         any(k in path.lower() for k in ["src", "app", "api", "backend", "frontend", "pages", "notebooks"])
     ):
         return True
+
     return False
 
-
-def build_repo_tree(file_paths: list[str]) -> str:
+def build_repo_tree(file_paths: list) -> str:
     lines = []
     for path in sorted(file_paths):
         depth = path.count(os.sep)
@@ -72,10 +77,10 @@ def build_repo_tree(file_paths: list[str]) -> str:
         lines.append(f"{indent}- {os.path.basename(path) if depth else path}")
     return "\n".join(lines)
 
-
 def summarize_context(files: list) -> str:
     important = [f for f in files if is_important_file(f["path"])]
     important = important[:20]
+
     chunks = []
     for f in important:
         content = f["content"][:2500]
@@ -83,38 +88,43 @@ def summarize_context(files: list) -> str:
             f"\n### FILE: {f['path']}\n"
             f"```text\n{content}\n```"
         )
-    return "\n".join(chunks)
 
+    return "\n".join(chunks)
 
 def clone_repo(state: AgentState):
     update_progress(state, "Cloning repository", 10)
     temp_dir = tempfile.mkdtemp()
+
     clean_url = clean_github_url(state.github_url)
     print(f"Agent: Attempting to clone from cleaned URL: {clean_url}")
+
     try:
         Repo.clone_from(clean_url, temp_dir, depth=1, single_branch=True)
         state.repo_path = temp_dir
     except GitCommandError as e:
-        shutil.rmtree(temp_dir, ignore_errors=True)
         raise ValueError(f"Git clone failed: {e.stderr.strip()}")
     except Exception as e:
-        shutil.rmtree(temp_dir, ignore_errors=True)
         raise ValueError(f"Unexpected error during cloning: {e}")
-    return state
 
+    return state
 
 def scan_files(state: AgentState):
     update_progress(state, "Scanning and indexing files", 20)
     all_files = []
+
     for root, dirs, files in os.walk(state.repo_path):
         dirs[:] = [d for d in dirs if not any(fnmatch(d, p) for p in IGNORED_PATTERNS)]
+
         for file in files:
             if any(fnmatch(file, p) for p in IGNORED_PATTERNS):
                 continue
+
             full_path = os.path.join(root, file)
             rel_path = os.path.relpath(full_path, state.repo_path)
+
             if os.path.getsize(full_path) > MAX_FILE_SIZE_KB * 1024:
                 continue
+
             try:
                 with open(full_path, "r", encoding="utf-8") as f:
                     content = f.read()
@@ -123,16 +133,21 @@ def scan_files(state: AgentState):
                 continue
             except Exception:
                 continue
+
     state.files = all_files[:MAX_FILES_PER_REPO]
     state.repo_tree = build_repo_tree([f["path"] for f in state.files])
     state.repo_context = summarize_context(state.files)
+
     if not state.files:
         raise ValueError("No processable files found in the repository.")
-    return state
 
+    return state
 
 def analyze_architecture(state: AgentState):
     update_progress(state, "Analyzing architecture and dependencies", 40)
+
+    llm = get_llm()  # ← Initialize LLM here, not at module level
+
     prompt = f"""
 You are a senior software engineer analyzing a real code repository.
 
@@ -157,14 +172,16 @@ Rules:
 - If something is unclear, explicitly say "unclear from repository contents"
 - Do NOT invent frameworks, commands, features, or deployment details
 - Be concrete, not generic
-
 """
+
     state.architecture = llm.invoke(prompt).content
     return state
 
-
 def generate_all_docs(state: AgentState):
     update_progress(state, "Generating documentation", 70)
+
+    llm = get_llm()  # ← Initialize LLM here
+
     root_prompt = f"""
 You are generating README.md for a specific repository.
 
@@ -198,11 +215,12 @@ Rules:
 - Do not write generic filler
 - Do not invent package managers, scripts, endpoints, or architecture
 - Use the real repository context above
-
 """
+
     state.root_readme = llm.invoke(root_prompt).content
 
     folders = sorted(set(os.path.dirname(f["path"]) for f in state.files if os.path.dirname(f["path"])))
+
     for folder in folders[:30]:
         folder_files = [f["path"] for f in state.files if f["path"].startswith(folder + os.sep) or f["path"].startswith(folder + "/")]
         prompt = f"""
@@ -224,16 +242,16 @@ Write a concise folder README that explains:
 
 Only use the provided information.
 If unclear, say so.
-
 """
         state.folder_readmes[folder] = llm.invoke(prompt).content
 
     return state
 
-
 def upload_result(state: AgentState):
     update_progress(state, "Uploading documentation", 90)
+
     full_bundle = {"README.md": state.root_readme or "README generation failed."}
+
     for folder, content in state.folder_readmes.items():
         full_bundle[f"{folder}/README.md"] = content
 
@@ -244,8 +262,8 @@ def upload_result(state: AgentState):
 
     return state
 
-
 workflow = StateGraph(AgentState)
+
 workflow.add_node("clone_repo", clone_repo)
 workflow.add_node("scan_files", scan_files)
 workflow.add_node("analyze_architecture", analyze_architecture)
@@ -261,14 +279,15 @@ workflow.add_edge("upload_result", END)
 
 agent = workflow.compile()
 
-
 def run_documentation_agent(github_url, progress_callback=None):
     initial_state = AgentState(
         github_url=github_url,
         progress_callback=progress_callback
     )
+
     try:
         result_state = agent.invoke(initial_state)
+
         if isinstance(result_state, dict):
             final_public_url = result_state.get("public_url")
         else:
