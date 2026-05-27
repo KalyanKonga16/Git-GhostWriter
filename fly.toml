@@ -1,5 +1,5 @@
 app = "git-ghostwriter-worker"
-primary_region = "sin"
+primary_region = "bom"
 
 [build]
   dockerfile = "Dockerfile.worker"
