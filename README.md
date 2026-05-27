@@ -1,17 +1,14 @@
-```markdown
-<h1 align="center">👻 Git-GhostWriter</h1>
-<p align="center">
-  <b>Autonomous Codebase Documenter</b><br>
-  <i>Transform any GitHub repository into intelligent, structured documentation using AI.</i>
-</p>
+# 👻 Git-GhostWriter
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/Streamlit-FF4B4B.svg?logo=streamlit&logoColor=white" alt="Streamlit">
-  <img src="https://img.shields.io/badge/Celery-37814A.svg?logo=celery&logoColor=white" alt="Celery">
-  <img src="https://img.shields.io/badge/LangGraph-1C3C3C.svg?logo=langchain&logoColor=white" alt="LangGraph">
-  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
-</p>
+### Autonomous Codebase Documenter
+
+*Transform any GitHub repository into intelligent, structured documentation using AI.*
+
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B.svg?logo=streamlit&logoColor=white)
+![Celery](https://img.shields.io/badge/Celery-37814A.svg?logo=celery&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-1C3C3C.svg?logo=langchain&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 ---
 
