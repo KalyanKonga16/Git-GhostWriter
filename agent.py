@@ -11,7 +11,8 @@ from config import *
 from storage import upload_docs
 import traceback
 
-llm = ChatGroq(model=LLM_MODEL, temperature=0.05)
+# --- REMOVED: llm = ChatGroq(...) at module level ---
+# We'll initialize it inside a function instead
 
 IMPORTANT_FILE_NAMES = {
     "README.md", "requirements.txt", "package.json", "pyproject.toml",
@@ -37,6 +38,10 @@ class AgentState(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+
+def get_llm():
+    """Initialize LLM lazily to ensure secrets are loaded first"""
+    return ChatGroq(model=LLM_MODEL, temperature=0.05)
 
 def update_progress(state, stage, progress):
     if state.progress_callback:
@@ -64,7 +69,7 @@ def is_important_file(path: str) -> bool:
 
     return False
 
-def build_repo_tree(file_paths: list[str]) -> str:
+def build_repo_tree(file_paths: list) -> str:
     lines = []
     for path in sorted(file_paths):
         depth = path.count(os.sep)
@@ -141,6 +146,8 @@ def scan_files(state: AgentState):
 def analyze_architecture(state: AgentState):
     update_progress(state, "Analyzing architecture and dependencies", 40)
 
+    llm = get_llm()  # ← Initialize LLM here, not at module level
+
     prompt = f"""
 You are a senior software engineer analyzing a real code repository.
 
@@ -172,6 +179,8 @@ Rules:
 
 def generate_all_docs(state: AgentState):
     update_progress(state, "Generating documentation", 70)
+
+    llm = get_llm()  # ← Initialize LLM here
 
     root_prompt = f"""
 You are generating README.md for a specific repository.
