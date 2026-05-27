@@ -37,7 +37,7 @@ The system follows a strict **async producer-consumer pattern** running entirely
 │  ┌──────────────────┐         ┌──────────▼───────────┐     │
 │  │  📄 Generated    │         │  ⚙️  Celery Worker   │     │
 │  │  Documentation   │ ◄────── │  (Local Process)     │     │
-│  │  (View in Browser│         │                      │     │
+│  │ (View in Browser)│         │                      │     │
 │  └──────────────────┘         └──────────┬───────────┘     │
 └──────────────────────────────────────────│──────────────────┘
                                            │
