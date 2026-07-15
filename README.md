@@ -185,12 +185,6 @@ To use this tool, simply keep both terminal windows open while processing jobs.
 
 ---
 
-## 📜 License
-
-MIT License — See `LICENSE` file for details.
-
----
-
 <p align="center">
   <b>Built with 🖤 by Kalyan Konga</b><br>
   <a href="https://github.com/KalyanKonga16">@KalyanKonga16</a>
